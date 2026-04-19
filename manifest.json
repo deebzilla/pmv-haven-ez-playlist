@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "PMV Haven Playlist Helper",
+  "version": "1.0.0",
+  "description": "Add linked PMV Haven videos or all open PMV Haven tabs to a chosen playlist.",
+  "permissions": [
+    "contextMenus",
+    "storage",
+    "tabs",
+    "scripting",
+    "notifications"
+  ],
+  "host_permissions": [
+    "https://pmvhaven.com/*",
+    "https://www.pmvhaven.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "icons": {
+    "128": "icon.png"
+  },
+  "options_page": "options.html",
+  "action": {
+    "default_title": "PMV Haven Playlist Helper",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "128": "icon.png"
+    }
+  }
+}

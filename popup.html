@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PMV Haven Playlist Helper</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #111111;
+      --panel: #1c1c1c;
+      --text: #f5f5f5;
+      --muted: #a3a3a3;
+      --accent: #f97316;
+      --accent-strong: #ea580c;
+      --line: #303030;
+      --ok: #22c55e;
+      --bad: #f87171;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      width: 360px;
+      font-family: "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top, rgba(249, 115, 22, 0.18), transparent 35%),
+        linear-gradient(180deg, #111111, #171717);
+      color: var(--text);
+    }
+
+    main {
+      padding: 16px;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 1.15rem;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .card {
+      background: rgba(28, 28, 28, 0.95);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    .stack {
+      display: grid;
+      gap: 12px;
+    }
+
+    .label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #fb923c;
+      font-weight: 700;
+    }
+
+    .value {
+      font-weight: 600;
+      word-break: break-word;
+    }
+
+    button {
+      width: 100%;
+      border: 0;
+      border-radius: 12px;
+      padding: 12px 14px;
+      font-size: 0.98rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+      color: white;
+    }
+
+    .secondary {
+      background: #252525;
+      color: var(--text);
+      border: 1px solid #3a3a3a;
+    }
+
+    .status {
+      min-height: 42px;
+      font-size: 0.92rem;
+      line-height: 1.45;
+      color: var(--muted);
+    }
+
+    .status.success {
+      color: var(--ok);
+    }
+
+    .status.error {
+      color: var(--bad);
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+      max-height: 120px;
+      overflow: auto;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="stack">
+      <div class="card stack">
+        <div>
+          <h1>PMV Haven Playlist Helper</h1>
+          <p>Add all open PMV Haven video tabs in one click.</p>
+        </div>
+
+        <div>
+          <div class="label">Playlist</div>
+          <div id="playlist" class="value">Loading...</div>
+        </div>
+
+        <div>
+          <div class="label">Open PMV Tabs</div>
+          <div id="tab-count" class="value">Checking...</div>
+        </div>
+
+        <button id="add-all" class="primary">Add All Open PMV Tabs</button>
+        <button id="settings" class="secondary">Open Settings</button>
+        <div id="status" class="status" aria-live="polite"></div>
+        <ul id="details" hidden></ul>
+      </div>
+    </div>
+
+    <script src="popup.js"></script>
+  </main>
+</body>
+</html>
