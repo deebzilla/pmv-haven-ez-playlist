@@ -3,6 +3,7 @@ const MENU_IDS = {
   addLink: "pmvhaven-add-link",
   addPage: "pmvhaven-add-page",
   addAllTabs: "pmvhaven-add-all-tabs",
+  importPagePlaylist: "pmvhaven-import-page-playlist",
   openOptions: "pmvhaven-open-options"
 };
 
@@ -32,10 +33,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     getPlaylistConfig()
       .then(async (config) => {
         const videoIds = await collectOpenVideoIds();
+        const currentPlaylist = await getCurrentTabPlaylist();
         sendResponse({
           ok: true,
           config,
-          openTabCount: videoIds.length
+          openTabCount: videoIds.length,
+          currentPlaylist
         });
       })
       .catch((error) => {
@@ -49,6 +52,30 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   if (message.type === "add-all-tabs") {
     handleAddAllTabs()
+      .then((result) => sendResponse({ ok: true, result }))
+      .catch((error) =>
+        sendResponse({
+          ok: false,
+          error: error.message || String(error)
+        })
+      );
+    return true;
+  }
+
+  if (message.type === "import-playlist") {
+    handleImportPlaylist(message.playlistInput || "")
+      .then((result) => sendResponse({ ok: true, result }))
+      .catch((error) =>
+        sendResponse({
+          ok: false,
+          error: error.message || String(error)
+        })
+      );
+    return true;
+  }
+
+  if (message.type === "import-current-playlist") {
+    handleImportCurrentPlaylist()
       .then((result) => sendResponse({ ok: true, result }))
       .catch((error) =>
         sendResponse({
@@ -119,6 +146,16 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
       const result = await addVideoIdsToPlaylist(videoIds, config.playlistId);
       await showBatchResult(result, videoIds.length, config.menuLabel);
+      return;
+    }
+
+    if (info.menuItemId === MENU_IDS.importPagePlaylist) {
+      const playlistId = normalizePlaylistId(tab?.url || info.pageUrl || "");
+      if (!playlistId) {
+        throw new Error("This page is not a PMV Haven playlist.");
+      }
+      const result = await importPlaylistIntoSavedPlaylist(playlistId, config);
+      await showImportResult(result, config.menuLabel);
     }
   } catch (error) {
     await showNotification("PMV Haven helper error", error.message || String(error));
@@ -147,6 +184,16 @@ async function createMenus() {
     id: MENU_IDS.addAllTabs,
     title: `Add all open PMV Haven tabs to ${label}`,
     contexts: ["action"]
+  });
+
+  chrome.contextMenus.create({
+    id: MENU_IDS.importPagePlaylist,
+    title: `Import this PMV Haven playlist into ${label}`,
+    contexts: ["page"],
+    documentUrlPatterns: [
+      "https://pmvhaven.com/playlists/*",
+      "https://www.pmvhaven.com/playlists/*"
+    ]
   });
 
   chrome.contextMenus.create({
@@ -236,6 +283,38 @@ async function addVideoIdsToPlaylist(videoIds, playlistId) {
       throw new Error(
         "PMV Haven rejected the request. Make sure you are logged in there in this browser."
       );
+    }
+
+    return result;
+  } finally {
+    if (helperTab.created) {
+      await chrome.tabs.remove(helperTab.tabId);
+    }
+  }
+}
+
+async function fetchPlaylistVideoIds(sourcePlaylistId) {
+  const helperTab = await ensureHelperTab();
+  try {
+    const [{ result }] = await chrome.scripting.executeScript({
+      target: { tabId: helperTab.tabId },
+      world: "ISOLATED",
+      func: runPlaylistFetch,
+      args: [sourcePlaylistId]
+    });
+
+    if (!result) {
+      throw new Error("PMV Haven did not return playlist data.");
+    }
+
+    if (result.authError) {
+      throw new Error(
+        "PMV Haven rejected the playlist request. Make sure you are logged in there in this browser."
+      );
+    }
+
+    if (!result.ok) {
+      throw new Error(result.error || "Failed to load playlist videos.");
     }
 
     return result;
@@ -342,6 +421,65 @@ function runPlaylistAdditions(playlistId, videoIds) {
   })();
 }
 
+function runPlaylistFetch(sourcePlaylistId) {
+  return (async () => {
+    try {
+      const apiUrl = new URL(`/api/playlists/${sourcePlaylistId}`, window.location.origin);
+      apiUrl.searchParams.set("fetchAll", "true");
+
+      const response = await fetch(apiUrl.toString(), {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "accept": "application/json"
+        }
+      });
+
+      let payload = null;
+      try {
+        payload = await response.json();
+      } catch (_error) {
+        payload = null;
+      }
+
+      if (response.status === 401 || response.status === 403) {
+        return { ok: false, authError: true, error: `HTTP ${response.status}` };
+      }
+
+      if (!response.ok || payload?.success === false) {
+        return {
+          ok: false,
+          authError: false,
+          error: payload?.statusMessage || payload?.message || `HTTP ${response.status}`
+        };
+      }
+
+      const videoDetails = Array.isArray(payload?.data?.videoDetails) ? payload.data.videoDetails : [];
+      const videoIds = Array.from(
+        new Set(
+          videoDetails
+            .map((video) => video?._id || video?.id || null)
+            .filter(Boolean)
+        )
+      );
+
+      return {
+        ok: true,
+        authError: false,
+        playlistName: payload?.data?.name || "",
+        sourcePlaylistId,
+        videoIds
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        authError: false,
+        error: error?.message || String(error)
+      };
+    }
+  })();
+}
+
 async function showBatchResult(result, requestedCount, label) {
   const successCount = result.successes.length;
   const failureCount = result.failures.length;
@@ -364,6 +502,31 @@ async function showBatchResult(result, requestedCount, label) {
 
   const firstFailure = result.failures[0]?.message || "No videos were added.";
   await showNotification("Nothing added", firstFailure);
+}
+
+async function showImportResult(result, label) {
+  const sourceName = result.sourcePlaylistName || result.sourcePlaylistId;
+  const successCount = result.successes.length;
+  const failureCount = result.failures.length;
+
+  if (successCount > 0 && failureCount === 0) {
+    await showNotification(
+      "Playlist imported",
+      `Imported ${successCount} video${successCount === 1 ? "" : "s"} from ${sourceName} into ${label}.`
+    );
+    return;
+  }
+
+  if (successCount > 0) {
+    await showNotification(
+      "Playlist partly imported",
+      `Imported ${successCount} of ${result.requestedCount} from ${sourceName}. ${failureCount} failed.`
+    );
+    return;
+  }
+
+  const firstFailure = result.failures[0]?.message || "No videos were imported.";
+  await showNotification("Playlist import failed", firstFailure);
 }
 
 async function showNotification(title, message) {
@@ -403,5 +566,63 @@ async function handleAddAllTabs() {
     ...result,
     requestedCount: videoIds.length,
     playlistLabel: config.menuLabel
+  };
+}
+
+async function handleImportPlaylist(playlistInput) {
+  const config = await getPlaylistConfig();
+  if (!config.playlistId) {
+    throw new Error("No playlist is configured yet.");
+  }
+
+  const sourcePlaylistId = normalizePlaylistId(playlistInput);
+  if (!sourcePlaylistId) {
+    throw new Error("Paste a valid PMV Haven playlist URL or playlist ID.");
+  }
+
+  const result = await importPlaylistIntoSavedPlaylist(sourcePlaylistId, config);
+  await showImportResult(result, config.menuLabel);
+  return result;
+}
+
+async function handleImportCurrentPlaylist() {
+  const currentPlaylist = await getCurrentTabPlaylist();
+  if (!currentPlaylist?.playlistId) {
+    throw new Error("Open a PMV Haven playlist page first.");
+  }
+
+  return handleImportPlaylist(currentPlaylist.playlistId);
+}
+
+async function importPlaylistIntoSavedPlaylist(sourcePlaylistId, config) {
+  if (sourcePlaylistId === config.playlistId) {
+    throw new Error("The source playlist matches your saved playlist.");
+  }
+
+  const sourcePlaylist = await fetchPlaylistVideoIds(sourcePlaylistId);
+  if (sourcePlaylist.videoIds.length === 0) {
+    throw new Error("That playlist does not appear to contain any videos.");
+  }
+
+  const result = await addVideoIdsToPlaylist(sourcePlaylist.videoIds, config.playlistId);
+  return {
+    ...result,
+    requestedCount: sourcePlaylist.videoIds.length,
+    playlistLabel: config.menuLabel,
+    sourcePlaylistId,
+    sourcePlaylistName: sourcePlaylist.playlistName
+  };
+}
+
+async function getCurrentTabPlaylist() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const playlistId = normalizePlaylistId(tab?.url || "");
+  if (!playlistId) {
+    return null;
+  }
+
+  return {
+    playlistId,
+    url: tab.url || ""
   };
 }

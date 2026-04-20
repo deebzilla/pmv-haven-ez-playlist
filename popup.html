@@ -83,6 +83,16 @@
       cursor: pointer;
     }
 
+    input {
+      width: 100%;
+      border: 1px solid #3a3a3a;
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 0.95rem;
+      background: #171717;
+      color: var(--text);
+    }
+
     .primary {
       background: linear-gradient(135deg, var(--accent), var(--accent-strong));
       color: white;
@@ -137,7 +147,18 @@
           <div id="tab-count" class="value">Checking...</div>
         </div>
 
+        <div>
+          <div class="label">Current Playlist Page</div>
+          <div id="current-playlist" class="value">Checking...</div>
+        </div>
+
         <button id="add-all" class="primary">Add All Open PMV Tabs</button>
+        <button id="import-current" class="secondary">Import Current Playlist Page</button>
+        <div class="stack">
+          <div class="label">Import By Playlist URL</div>
+          <input id="playlist-input" type="text" placeholder="Paste a PMV Haven playlist URL or ID">
+          <button id="import-playlist" class="secondary">Import Playlist Into Mine</button>
+        </div>
         <button id="settings" class="secondary">Open Settings</button>
         <div id="status" class="status" aria-live="polite"></div>
         <ul id="details" hidden></ul>

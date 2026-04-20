@@ -9,6 +9,7 @@ Instead of opening every video and clicking into the playlist flow one at a time
 - Add a PMV Haven video from a right-clicked link
 - Add the currently open PMV Haven video page
 - Bulk-add all open PMV Haven video tabs
+- Import every video from another PMV Haven playlist into your saved playlist
 - Save a default playlist once and reuse it
 - See visible success and failure feedback in the popup
 
@@ -51,10 +52,20 @@ Example:
 - Click the extension icon.
 - Press `Add All Open PMV Tabs`.
 
+### Import another playlist into yours
+
+- Open a PMV Haven playlist page and click `Import Current Playlist Page`
+
+Or:
+
+- Paste any PMV Haven playlist URL or playlist ID into the popup
+- Press `Import Playlist Into Mine`
+
 The popup shows:
 
 - the playlist currently configured
 - how many matching PMV Haven video tabs were found
+- whether the current page is a PMV Haven playlist
 - failure details if PMV Haven rejects any requests
 
 ## How It Works
